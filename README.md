@@ -30,7 +30,7 @@ When you place the loadLibrary call within a static block of a class, you must s
 ## Requirements
 
  * Linux
- * GraalVM CE 19.2.1 with native-image tool installed
+ * GraalVM CE 19.3.x with native-image tool installed
  * Working GNU C compiler
 
 ## Overview
@@ -41,37 +41,46 @@ When you place the loadLibrary call within a static block of a class, you must s
 
 `HelloWorld.class` is built into a jar with a simple manifest.
 
+## Preparation
+
+Ensure `GRAALVM_HOME` and `PATH` are appropriately set.
+
+Note that putting `GRAALVM_HOME/bin` on `PATH` appropriately will lead to `javac` and `jar` being used from Graal.
+
 ## Build and run a JNI jar
 
 ```
 $ make run-jar
 javac src/HelloWorld.java
 cd src && jar cfm ../HelloWorld.jar manifest.txt HelloWorld.class
-cd src && javah -jni HelloWorld
-gcc -shared -Wall -Werror -I/usr/lib/jvm/java-8-oracle/include -I/usr/lib/jvm/java-8-oracle/include/linux -o libHelloWorld.so -fPIC src/HelloWorld.c
+cd src && javac -h . HelloWorld.java
+gcc -shared -Wall -Werror -I$GRAALVM_HOME/include -I$GRAALVM_HOME/include/linux -o libHelloWorld.so -fPIC src/HelloWorld.c
 LD_LIBRARY_PATH=./ java -jar HelloWorld.jar
 Hello world; this is C talking!
 ```
 
+Note: output has been slightly modified for paths.
+
 ## Build and run a native image
 
-(you can specify a custom GRAALVM path with `make run-native GRAALVM=/path/to/my/graalvm`)
+(you can specify a custom GRAALVM path with `make run-native GRAALVM_HOME=/path/to/my/graalvm`)
 
 ```
 $ make run-native
-/home/crispin/graalvm-ce-19.2.1/bin/native-image \
-    -jar HelloWorld.jar \
-    -H:Name=helloworld \
-    -H:+ReportExceptionStackTraces \
-    -H:ConfigurationFileDirectories=config-dir \
-    --initialize-at-build-time \
-    --verbose \
-    --no-fallback \
-    --no-server \
-    "-J-Xmx1g" \
-    -H:+TraceClassInitialization -H:+PrintClassInitialization
+cd src && jar cfm ../HelloWorld.jar manifest.txt HelloWorld.class
+$GRAALVM_HOME/bin/native-image \
+	-jar HelloWorld.jar \
+	-H:Name=helloworld \
+	-H:+ReportExceptionStackTraces \
+	-H:ConfigurationFileDirectories=config-dir \
+	--initialize-at-build-time \
+	--verbose \
+	--no-fallback \
+	--no-server \
+	"-J-Xmx1g" \
+	-H:+TraceClassInitialization -H:+PrintClassInitialization
 Executing [
-/home/crispin/graalvm-ce-19.2.1/jre/bin/java \
+$GRAALVM_HOME/jre/bin/java \
 -XX:+UnlockExperimentalVMOptions \
 -XX:+EnableJVMCI \
 -Dtruffle.TrustAllTruffleRuntimeProviders=true \
@@ -86,21 +95,24 @@ Executing [
 -Xmx14g \
 -Duser.country=US \
 -Duser.language=en \
--Dorg.graalvm.version=19.2.1 \
+-Dorg.graalvm.version=19.3.0.2 \
 -Dorg.graalvm.config=CE \
 -Dcom.oracle.graalvm.isaot=true \
--Djvmci.class.path.append=/home/crispin/graalvm-ce-19.2.1/jre/lib/jvmci/graal.jar \
--javaagent:/home/crispin/graalvm-ce-19.2.1/jre/lib/svm/builder/svm.jar \
+-Djvmci.class.path.append=$GRAALVM_HOME/jre/lib/jvmci/graal.jar \
+-javaagent:$GRAALVM_HOME/jre/lib/svm/builder/svm.jar=traceInitialization \
+-Djdk.internal.lambda.disableEagerInitialization=true \
+-Djdk.internal.lambda.eagerlyInitialize=false \
+-Djava.lang.invoke.InnerClassLambdaMetafactory.initializeLambdas=false \
 -Xmx1g \
--Xbootclasspath/a:/home/crispin/graalvm-ce-19.2.1/jre/lib/boot/graaljs-scriptengine.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/boot/graal-sdk.jar \
+-Xbootclasspath/a:$GRAALVM_HOME/jre/lib/boot/graal-sdk.jar:$GRAALVM_HOME/jre/lib/boot/graaljs-scriptengine.jar \
 -cp \
-/home/crispin/graalvm-ce-19.2.1/jre/lib/svm/builder/svm.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/svm/builder/javacpp.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/svm/builder/svm-llvm.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/svm/builder/graal-llvm.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/svm/builder/llvm-platform-specific.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/svm/builder/llvm-wrapper.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/svm/builder/objectfile.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/svm/builder/pointsto.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/jvmci/jvmci-hotspot.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/jvmci/graal-management.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/jvmci/jvmci-api.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/jvmci/graal.jar \
+$GRAALVM_HOME/jre/lib/svm/builder/svm-llvm.jar:$GRAALVM_HOME/jre/lib/svm/builder/graal-llvm.jar:$GRAALVM_HOME/jre/lib/svm/builder/llvm-platform-specific-shadowed.jar:$GRAALVM_HOME/jre/lib/svm/builder/svm.jar:$GRAALVM_HOME/jre/lib/svm/builder/objectfile.jar:$GRAALVM_HOME/jre/lib/svm/builder/pointsto.jar:$GRAALVM_HOME/jre/lib/svm/builder/llvm-wrapper-shadowed.jar:$GRAALVM_HOME/jre/lib/svm/builder/javacpp-shadowed.jar:$GRAALVM_HOME/jre/lib/jvmci/jvmci-api.jar:$GRAALVM_HOME/jre/lib/jvmci/graal.jar:$GRAALVM_HOME/jre/lib/jvmci/jvmci-hotspot.jar:$GRAALVM_HOME/jre/lib/jvmci/graal-management.jar \
 com.oracle.svm.hosted.NativeImageGeneratorRunner \
 -watchpid \
-10964 \
+7247 \
 -imagecp \
-/home/crispin/graalvm-ce-19.2.1/jre/lib/boot/graaljs-scriptengine.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/boot/graal-sdk.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/svm/builder/svm.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/svm/builder/javacpp.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/svm/builder/svm-llvm.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/svm/builder/graal-llvm.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/svm/builder/llvm-platform-specific.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/svm/builder/llvm-wrapper.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/svm/builder/objectfile.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/svm/builder/pointsto.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/jvmci/jvmci-hotspot.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/jvmci/graal-management.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/jvmci/jvmci-api.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/jvmci/graal.jar:/home/crispin/graalvm-ce-19.2.1/jre/lib/svm/library-support.jar:/home/crispin/dev/epiccastle/graal-native-image-jni/HelloWorld.jar \
--H:Path=/home/crispin/dev/epiccastle/graal-native-image-jni \
+$GRAALVM_HOME/jre/lib/boot/graal-sdk.jar:$GRAALVM_HOME/jre/lib/boot/graaljs-scriptengine.jar:$GRAALVM_HOME/jre/lib/svm/builder/svm-llvm.jar:$GRAALVM_HOME/jre/lib/svm/builder/graal-llvm.jar:$GRAALVM_HOME/jre/lib/svm/builder/llvm-platform-specific-shadowed.jar:$GRAALVM_HOME/jre/lib/svm/builder/svm.jar:$GRAALVM_HOME/jre/lib/svm/builder/objectfile.jar:$GRAALVM_HOME/jre/lib/svm/builder/pointsto.jar:$GRAALVM_HOME/jre/lib/svm/builder/llvm-wrapper-shadowed.jar:$GRAALVM_HOME/jre/lib/svm/builder/javacpp-shadowed.jar:$GRAALVM_HOME/jre/lib/jvmci/jvmci-api.jar:$GRAALVM_HOME/jre/lib/jvmci/graal.jar:$GRAALVM_HOME/jre/lib/jvmci/jvmci-hotspot.jar:$GRAALVM_HOME/jre/lib/jvmci/graal-management.jar:$GRAALVM_HOME/jre/lib/svm/library-support.jar:...graal-native-image-jni/HelloWorld.jar \
+-H:Path=...graal-native-image-jni \
 -H:Class=HelloWorld \
 -H:+ReportExceptionStackTraces \
 -H:ConfigurationFileDirectories=config-dir \
@@ -108,31 +120,33 @@ com.oracle.svm.hosted.NativeImageGeneratorRunner \
 -H:FallbackThreshold=0 \
 -H:+TraceClassInitialization \
 -H:+PrintClassInitialization \
--H:CLibraryPath=/home/crispin/graalvm-ce-19.2.1/jre/lib/svm/clibraries/linux-amd64 \
+-H:CLibraryPath=$GRAALVM_HOME/jre/lib/svm/clibraries/linux-amd64 \
 -H:Name=helloworld
 ]
-[helloworld:10986]    classlist:   1,616.92 ms
-[helloworld:10986]        (cap):   1,526.85 ms
-[helloworld:10986]        setup:   2,825.72 ms
-[helloworld:10986]   (typeflow):   5,943.24 ms
-[helloworld:10986]    (objects):   4,215.63 ms
-[helloworld:10986]   (features):     329.14 ms
-[helloworld:10986]     analysis:  10,674.16 ms
-Printing initializer configuration to /home/crispin/dev/epiccastle/graal-native-image-jni/reports/initializer_configuration_20191115_205814.txt
-Printing initializer dependencies to /home/crispin/dev/epiccastle/graal-native-image-jni/reports/initializer_dependencies_20191115_205814.dot
-Printing 0 classes that are considered as safe for build-time initialization to /home/crispin/dev/epiccastle/graal-native-image-jni/reports/safe_classes_20191115_205814.txt
-Printing 2599 classes of type BUILD_TIME to /home/crispin/dev/epiccastle/graal-native-image-jni/reports/build_time_classes_20191115_205814.txt
-Printing 13 classes of type RERUN to /home/crispin/dev/epiccastle/graal-native-image-jni/reports/rerun_classes_20191115_205814.txt
-Printing 0 classes of type RUN_TIME to /home/crispin/dev/epiccastle/graal-native-image-jni/reports/run_time_classes_20191115_205814.txt
-[helloworld:10986]     (clinit):     225.64 ms
-[helloworld:10986]     universe:     593.86 ms
-[helloworld:10986]      (parse):     896.34 ms
-[helloworld:10986]     (inline):   1,534.65 ms
-[helloworld:10986]    (compile):   7,715.71 ms
-[helloworld:10986]      compile:  10,785.92 ms
-[helloworld:10986]        image:     920.97 ms
-[helloworld:10986]        write:     123.24 ms
-[helloworld:10986]      [total]:  27,737.71 ms
+[helloworld:7271]    classlist:   1,308.37 ms
+[helloworld:7271]        (cap):     775.78 ms
+[helloworld:7271]        setup:   1,597.48 ms
+Printing initializer configuration to ...graal-native-image-jni/reports/initializer_configuration_20200120_200440.txt
+[helloworld:7271]   (typeflow):   2,915.15 ms
+[helloworld:7271]    (objects):   2,904.21 ms
+[helloworld:7271]   (features):     147.05 ms
+[helloworld:7271]     analysis:   6,169.77 ms
+Printing initializer dependencies to ...graal-native-image-jni/reports/initializer_dependencies_20200120_200447.dot
+Printing 0 classes that are considered as safe for build-time initialization to ...graal-native-image-jni/reports/safe_classes_20200120_200447.txt
+Printing 1691 classes of type BUILD_TIME to ...graal-native-image-jni/reports/build_time_classes_20200120_200447.txt
+Printing 43 classes of type RERUN to ...graal-native-image-jni/reports/rerun_classes_20200120_200447.txt
+Printing 0 classes of type RUN_TIME to ...graal-native-image-jni/reports/run_time_classes_20200120_200447.txt
+[helloworld:7271]     (clinit):     103.39 ms
+[helloworld:7271]     universe:     318.91 ms
+[helloworld:7271]      (parse):     315.21 ms
+[helloworld:7271]     (inline):     838.22 ms
+[helloworld:7271]    (compile):   2,606.59 ms
+[helloworld:7271]      compile:   3,967.77 ms
+[helloworld:7271]        image:     311.69 ms
+[helloworld:7271]        write:      84.33 ms
+[helloworld:7271]      [total]:  13,979.30 ms
 LD_LIBRARY_PATH=./ ./helloworld
 Hello world; this is C talking!
 ```
+
+Note: output has been slightly modified for paths.
